@@ -444,6 +444,18 @@ def command_validate(args: argparse.Namespace) -> None:
     print(f"{args.id}: valid")
 
 
+def command_ready(args: argparse.Namespace) -> None:
+    state, path = find_plan(args.id)
+
+    if state != "drafts":
+        fail(f"plan is not a draft: {args.id} (current state: {state})")
+
+    ensure_plan_valid(state, path)
+
+    args.state = "next"
+    command_transition(args)
+
+
 def command_transition(args: argparse.Namespace) -> None:
     source_state, source_path = find_plan(args.id)
     target_state = args.state
@@ -527,6 +539,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_parser.add_argument("id")
     validate_parser.set_defaults(func=command_validate)
+
+    ready_parser = subparsers.add_parser(
+        "ready",
+        help="Validate a draft plan and move it to the next state.",
+    )
+    ready_parser.add_argument("id")
+    ready_parser.set_defaults(func=command_ready)
 
     transition_parser = subparsers.add_parser(
         "transition",
