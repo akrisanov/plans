@@ -22,6 +22,8 @@ PLANS_HOME = Path(
 ).expanduser()
 
 PLANS_DIR = PLANS_HOME / "plans"
+PLAN_TEMPLATE = TOOL_ROOT / "templates" / "plan.md"
+PLAN_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 STATES = ("drafts", "next", "open", "done", "discarded")
 
@@ -155,7 +157,15 @@ def validate_plan_state(state: str, path: Path) -> None:
         )
 
 
-def find_plan(plan_id: str) -> tuple[str, Path]:
+def validate_plan_id(plan_id: str) -> None:
+    if not PLAN_ID_PATTERN.fullmatch(plan_id):
+        fail(
+            "invalid plan id: "
+            f"'{plan_id}' (expected lowercase kebab-case, e.g. 'add-plan-cli')"
+        )
+
+
+def find_plan_matches(plan_id: str) -> list[tuple[str, Path]]:
     matches: list[tuple[str, Path]] = []
 
     for state in STATES:
@@ -165,8 +175,14 @@ def find_plan(plan_id: str) -> tuple[str, Path]:
             continue
 
         for path in state_dir.glob("*.md"):
-            if read_metadata_value(path, "id") == plan_id:
+            if path.stem == plan_id or read_metadata_value(path, "id") == plan_id:
                 matches.append((state, path))
+
+    return matches
+
+
+def find_plan(plan_id: str) -> tuple[str, Path]:
+    matches = find_plan_matches(plan_id)
 
     if not matches:
         fail(f"plan not found: {plan_id}")
@@ -333,6 +349,50 @@ def ensure_plan_valid(state: str, path: Path) -> None:
     raise SystemExit(1)
 
 
+def command_add(args: argparse.Namespace) -> None:
+    validate_plan_id(args.id)
+
+    if find_plan_matches(args.id):
+        fail(f"plan already exists: {args.id}")
+
+    repository = args.repository.strip()
+
+    if not repository:
+        fail("repository must not be empty")
+
+    if not PLAN_TEMPLATE.is_file():
+        fail(f"plan template not found: {display_path(PLAN_TEMPLATE)}")
+
+    drafts_dir = PLANS_DIR / "drafts"
+    drafts_dir.mkdir(parents=True, exist_ok=True)
+
+    target_path = drafts_dir / f"{args.id}.md"
+
+    if target_path.exists():
+        fail(f"target already exists: {display_path(target_path)}")
+
+    today = date.today().isoformat()
+    content = PLAN_TEMPLATE.read_text(encoding="utf-8")
+
+    replacements = {
+        "id: TODO": f"id: {args.id}",
+        "repository: TODO": f"repository: {repository}",
+        "created_at: YYYY-MM-DD": f"created_at: {today}",
+        "updated_at: YYYY-MM-DD": f"updated_at: {today}",
+    }
+
+    for source, replacement in replacements.items():
+        if content.count(source) != 1:
+            fail(f"unexpected plan template format: expected exactly one '{source}'")
+
+        content = content.replace(source, replacement, 1)
+
+    target_path.write_text(content, encoding="utf-8")
+
+    print(f"{args.id}: created")
+    print(display_path(target_path))
+
+
 def command_list(_: argparse.Namespace) -> None:
     found = False
 
@@ -435,6 +495,18 @@ def build_parser() -> argparse.ArgumentParser:
         dest="command",
         required=True,
     )
+
+    add_parser = subparsers.add_parser(
+        "add",
+        help="Create a new draft plan from the plan template.",
+    )
+    add_parser.add_argument("id")
+    add_parser.add_argument(
+        "--repository",
+        required=True,
+        help="Logical repository name for the plan.",
+    )
+    add_parser.set_defaults(func=command_add)
 
     list_parser = subparsers.add_parser(
         "list",
