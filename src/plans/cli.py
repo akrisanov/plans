@@ -7,12 +7,10 @@ import os
 import re
 import shutil
 import sys
-from datetime import date
+from datetime import UTC, date, datetime
+from importlib.resources import files
 from pathlib import Path
 from typing import NoReturn
-
-
-TOOL_ROOT = Path(__file__).resolve().parent.parent
 
 PLANS_HOME = Path(
     os.environ.get(
@@ -22,7 +20,7 @@ PLANS_HOME = Path(
 ).expanduser()
 
 PLANS_DIR = PLANS_HOME / "plans"
-PLAN_TEMPLATE = TOOL_ROOT / "templates" / "plan.md"
+PLAN_TEMPLATE = files("plans").joinpath("templates/plan.md")
 PLAN_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 STATES = ("drafts", "next", "open", "done", "discarded")
@@ -81,10 +79,7 @@ def display_path(path: Path) -> str:
     try:
         return str(path.relative_to(PLANS_HOME))
     except ValueError:
-        try:
-            return str(path.relative_to(TOOL_ROOT))
-        except ValueError:
-            return str(path)
+        return str(path)
 
 
 def read_document(path: Path) -> tuple[str, str]:
@@ -361,7 +356,7 @@ def command_add(args: argparse.Namespace) -> None:
         fail("repository must not be empty")
 
     if not PLAN_TEMPLATE.is_file():
-        fail(f"plan template not found: {display_path(PLAN_TEMPLATE)}")
+        fail(f"plan template not found: {PLAN_TEMPLATE}")
 
     drafts_dir = PLANS_DIR / "drafts"
     drafts_dir.mkdir(parents=True, exist_ok=True)
@@ -371,7 +366,7 @@ def command_add(args: argparse.Namespace) -> None:
     if target_path.exists():
         fail(f"target already exists: {display_path(target_path)}")
 
-    today = date.today().isoformat()
+    today = datetime.now(UTC).date().isoformat()
     content = PLAN_TEMPLATE.read_text(encoding="utf-8")
 
     replacements = {
@@ -445,12 +440,10 @@ def command_validate(args: argparse.Namespace) -> None:
 
 
 def command_ready(args: argparse.Namespace) -> None:
-    state, path = find_plan(args.id)
+    state, _ = find_plan(args.id)
 
     if state != "drafts":
         fail(f"plan is not a draft: {args.id} (current state: {state})")
-
-    ensure_plan_valid(state, path)
 
     args.state = "next"
     command_transition(args)
@@ -481,7 +474,7 @@ def command_transition(args: argparse.Namespace) -> None:
     update_metadata(
         source_path,
         status=STATE_STATUS[target_state],
-        updated_at=date.today().isoformat(),
+        updated_at=datetime.now(UTC).date().isoformat(),
     )
 
     try:

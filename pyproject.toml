@@ -1,0 +1,35 @@
+[project]
+name = "plans"
+version = "0.1.0"
+description = "Portable, harness-agnostic planning and coordination for agent-driven software work."
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Andrey Krisanov", email = "238505+akrisanov@users.noreply.github.com" },
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+plan = "plans.cli:main"
+
+[project.urls]
+Repository = "https://github.com/akrisanov/plans"
+Issues = "https://github.com/akrisanov/plans/issues"
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["pytest>=9.1.1", "ruff>=0.16.7", "ty>=0.0.80"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "DTZ"]
+
+[tool.ty.environment]
+python-version = "3.12"
