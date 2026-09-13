@@ -1,2 +1,103 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100/
+.fseventsd/
+.Spotlight-V100/
+.TemporaryItems/
+.Trashes/
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux / desktop environments
+.directory
+.Trash-*
+.nfs*
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim / Neovim
+*.swp
+*.swo
+*.swn
+Session.vim
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Python bytecode / caches
 __pycache__/
 *.py[cod]
+*$py.class
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyright/
+.hypothesis/
+.tox/
+.nox/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Python packaging / build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
+pip-wheel-metadata/
+
+# Local type-checker configuration
+pyrightconfig.local.json
+
+# Environment / local configuration
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs / temporary files
+*.log
+*.tmp
+*.temp
+.tmp/
+tmp/
+
+# Editor / patch backups
+*.bak
+*.orig

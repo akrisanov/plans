@@ -206,9 +206,9 @@ It is intended to work with systems such as:
 
 Harness-specific execution belongs outside the core planning protocol.
 
-## Related project
+## Related projects
 
-My [local-agent-stack](https://github.com/akrisanov/local-agent-stack) is a reproducible local environment
+- My [local-agent-stack](https://github.com/akrisanov/local-agent-stack) is a reproducible local environment
 for running and evaluating agent harnesses and models. It complements `plans` as an execution layer
 while `plans` remains responsible for durable planning and coordination state.
 
