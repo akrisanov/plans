@@ -5,7 +5,11 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
+import yaml
+from pydantic import ValidationError
+
 from plans.config import PLANS_DIR, PLANS_HOME, STATE_STATUS, STATES
+from plans.models import PlanMetadata
 
 
 def fail(message: str) -> NoReturn:
@@ -37,19 +41,39 @@ def read_document(path: Path) -> tuple[str, str]:
     return frontmatter, body
 
 
-def read_metadata_value(path: Path, key: str) -> str | None:
+def read_frontmatter(path: Path) -> dict[str, object]:
     frontmatter, _ = read_document(path)
 
-    match = re.search(
-        rf"^{re.escape(key)}:\s*(.*?)\s*$",
-        frontmatter,
-        re.MULTILINE,
-    )
+    try:
+        data = yaml.safe_load(frontmatter)
+    except yaml.YAMLError as exc:
+        fail(f"invalid YAML frontmatter: {display_path(path)}: {exc}")
 
-    if not match:
-        return None
+    if not isinstance(data, dict):
+        fail(f"YAML frontmatter must be a mapping: {display_path(path)}")
 
-    return match.group(1).strip().strip("\"'")
+    if not all(isinstance(key, str) for key in data):
+        fail(f"YAML frontmatter keys must be strings: {display_path(path)}")
+
+    return {key: value for key, value in data.items() if isinstance(key, str)}
+
+
+def read_metadata(path: Path) -> PlanMetadata:
+    data = read_frontmatter(path)
+
+    try:
+        return PlanMetadata.model_validate(data)
+    except ValidationError as exc:
+        errors = []
+
+        for error in exc.errors():
+            location = ".".join(str(part) for part in error["loc"])
+            message = error["msg"]
+            errors.append(f"{location}: {message}")
+
+        details = "; ".join(errors)
+
+        fail(f"invalid plan metadata: {display_path(path)}: {details}")
 
 
 def update_metadata(path: Path, **values: str) -> None:
@@ -75,18 +99,14 @@ def update_metadata(path: Path, **values: str) -> None:
 
 
 def validate_plan_state(state: str, path: Path) -> None:
-    actual_status = read_metadata_value(path, "status")
-
-    if actual_status is None:
-        fail(f"missing metadata field 'status': {display_path(path)}")
-
+    metadata = read_metadata(path)
     expected_status = STATE_STATUS[state]
 
-    if actual_status != expected_status:
+    if metadata.status != expected_status:
         fail(
             f"inconsistent plan state for {display_path(path)}: "
             f"directory '{state}' expects status '{expected_status}', "
-            f"got '{actual_status}'"
+            f"got '{metadata.status}'"
         )
 
 
@@ -100,7 +120,9 @@ def find_plan_matches(plan_id: str) -> list[tuple[str, Path]]:
             continue
 
         for path in state_dir.glob("*.md"):
-            if path.stem == plan_id or read_metadata_value(path, "id") == plan_id:
+            metadata = read_metadata(path)
+
+            if path.stem == plan_id or metadata.id == plan_id:
                 matches.append((state, path))
 
     return matches

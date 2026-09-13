@@ -8,13 +8,15 @@ from plans.storage import (
     display_path,
     fail,
     find_plan,
-    read_metadata_value,
     update_metadata,
 )
 from plans.validation import ensure_plan_valid
 
 
-def transition_plan(plan_id: str, target_state: str) -> None:
+def transition_plan(
+    plan_id: str,
+    target_state: str,
+) -> None:
     source_state, source_path = find_plan(plan_id)
 
     if target_state not in TRANSITIONS[source_state]:
@@ -30,10 +32,6 @@ def transition_plan(plan_id: str, target_state: str) -> None:
 
     if target_path.exists():
         fail(f"target already exists: {display_path(target_path)}")
-
-    for key in ("status", "updated_at"):
-        if read_metadata_value(source_path, key) is None:
-            fail(f"missing metadata field '{key}': {display_path(source_path)}")
 
     update_metadata(
         source_path,

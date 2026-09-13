@@ -17,7 +17,13 @@ PLAN_TEMPLATE = files("plans").joinpath("templates/plan.md")
 
 PLAN_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
-STATES = ("drafts", "next", "open", "done", "discarded")
+STATES = (
+    "drafts",
+    "next",
+    "open",
+    "done",
+    "discarded",
+)
 
 STATE_STATUS = {
     "drafts": "draft",
@@ -34,16 +40,6 @@ TRANSITIONS = {
     "done": set(),
     "discarded": set(),
 }
-
-REQUIRED_METADATA = (
-    "id",
-    "status",
-    "repository",
-    "created_at",
-    "updated_at",
-    "depends_on",
-    "prs",
-)
 
 REQUIRED_READY_SECTIONS = (
     "Problem",

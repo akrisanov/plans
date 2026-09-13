@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import re
 import sys
-from datetime import date
 from pathlib import Path
 
 from plans.config import (
     PLACEHOLDERS,
-    REQUIRED_METADATA,
     REQUIRED_READY_SECTIONS,
     STATE_STATUS,
 )
-from plans.storage import display_path, read_document
+from plans.storage import (
+    display_path,
+    read_document,
+    read_metadata,
+)
 
 
 def extract_section(body: str, heading: str) -> str | None:
@@ -58,75 +60,33 @@ def has_meaningful_checklist_item(content: str) -> bool:
     return False
 
 
-def is_valid_date(value: str) -> bool:
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
-        return False
-
-    try:
-        date.fromisoformat(value)
-    except ValueError:
-        return False
-
-    return True
-
-
 def collect_validation_errors(
     state: str,
     path: Path,
 ) -> list[str]:
     errors: list[str] = []
 
-    frontmatter, body = read_document(path)
+    _, body = read_document(path)
+    metadata = read_metadata(path)
 
-    metadata: dict[str, str | None] = {}
-
-    for key in REQUIRED_METADATA:
-        match = re.search(
-            rf"^{re.escape(key)}:\s*(.*?)\s*$",
-            frontmatter,
-            re.MULTILINE,
+    if metadata.id != path.stem:
+        errors.append(
+            f"plan id '{metadata.id}' does not match filename '{path.stem}.md'"
         )
 
-        if match:
-            metadata[key] = match.group(1).strip().strip("\"'")
-        else:
-            metadata[key] = None
-
-    for key in REQUIRED_METADATA:
-        value = metadata[key]
-
-        if value is None:
-            errors.append(f"missing metadata field: {key}")
-            continue
-
-        if key not in {"depends_on", "prs"} and not value:
-            errors.append(f"metadata field is empty: {key}")
-
-    plan_id = metadata["id"]
-
-    if plan_id and plan_id != path.stem:
-        errors.append(f"plan id '{plan_id}' does not match filename '{path.stem}.md'")
-
-    status = metadata["status"]
     expected_status = STATE_STATUS[state]
 
-    if status and status != expected_status:
+    if metadata.status != expected_status:
         errors.append(
-            f"status '{status}' does not match directory "
+            f"status '{metadata.status}' does not match directory "
             f"state '{state}' (expected '{expected_status}')"
         )
 
-    for key in ("created_at", "updated_at"):
-        value = metadata[key]
+    if is_placeholder(metadata.id):
+        errors.append("metadata field 'id' contains a placeholder")
 
-        if value and not is_valid_date(value):
-            errors.append(f"metadata field '{key}' must use a valid YYYY-MM-DD date")
-
-    for key in ("id", "repository"):
-        value = metadata[key]
-
-        if value and is_placeholder(value):
-            errors.append(f"metadata field '{key}' contains a placeholder")
+    if is_placeholder(metadata.repository):
+        errors.append("metadata field 'repository' contains a placeholder")
 
     for heading in REQUIRED_READY_SECTIONS:
         content = extract_section(body, heading)

@@ -16,7 +16,7 @@ from plans.storage import (
     fail,
     find_plan,
     find_plan_matches,
-    read_metadata_value,
+    read_metadata,
     validate_plan_state,
 )
 from plans.validation import ensure_plan_valid
@@ -26,7 +26,9 @@ def validate_plan_id(plan_id: str) -> None:
     if not PLAN_ID_PATTERN.fullmatch(plan_id):
         fail(
             "invalid plan id: "
-            f"'{plan_id}' (expected lowercase kebab-case, e.g. 'add-plan-cli')"
+            f"'{plan_id}' "
+            "(expected lowercase kebab-case, "
+            "e.g. 'add-plan-cli')"
         )
 
 
@@ -86,13 +88,10 @@ def command_list(_: argparse.Namespace) -> None:
         plans: list[tuple[str, Path]] = []
 
         for path in sorted(state_dir.glob("*.md")):
-            plan_id = read_metadata_value(path, "id")
-
-            if plan_id is None:
-                fail(f"missing metadata field 'id': {display_path(path)}")
+            metadata = read_metadata(path)
 
             validate_plan_state(state, path)
-            plans.append((plan_id, path))
+            plans.append((metadata.id, path))
 
         if not plans:
             continue
