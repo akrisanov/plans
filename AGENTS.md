@@ -24,10 +24,20 @@ The system is intentionally independent of any specific agent harness, model, ma
 This repository contains reusable components such as:
 
 ```text
-scripts/
-templates/
+src/
+└── plans/
+    ├── cli.py
+    ├── config.py
+    ├── lifecycle.py
+    ├── models.py
+    ├── storage.py
+    ├── validation.py
+    └── templates/
+        └── plan.md
+tests/
 AGENTS.md
 README.md
+pyproject.toml
 ```
 
 User-specific planning data lives under `PLANS_HOME`, for example:
@@ -47,10 +57,10 @@ $PLANS_HOME/
 
 Do not add real user plans or private repository configuration to this repository.
 
-Reusable plan structure is defined in:
+Reusable plan structure is defined in the packaged template:
 
 ```text
-templates/plan.md
+src/plans/templates/plan.md
 ```
 
 ## Data root
