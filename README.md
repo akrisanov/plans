@@ -159,6 +159,15 @@ Show a plan:
 uv run plan show improve-cache-layer
 ```
 
+Inspect a plan as JSON:
+
+```bash
+uv run plan inspect improve-cache-layer --json
+```
+
+The inspection result contains `id`, `state`, `status`, `repository`, `created_at`,
+`updated_at`, `depends_on`, `prs`, and a `path` relative to `PLANS_HOME`.
+
 Validate that a plan is ready for implementation:
 
 ```bash

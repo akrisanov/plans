@@ -5,6 +5,8 @@ import re
 from importlib.resources import files
 from pathlib import Path
 
+from plans.models import PlanState, PlanStatus
+
 PLANS_HOME = Path(
     os.environ.get(
         "PLANS_HOME",
@@ -17,7 +19,7 @@ PLAN_TEMPLATE = files("plans").joinpath("templates/plan.md")
 
 PLAN_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
-STATES = (
+STATES: tuple[PlanState, ...] = (
     "drafts",
     "next",
     "open",
@@ -25,7 +27,7 @@ STATES = (
     "discarded",
 )
 
-STATE_STATUS = {
+STATE_STATUS: dict[PlanState, PlanStatus] = {
     "drafts": "draft",
     "next": "next",
     "open": "open",
@@ -33,7 +35,7 @@ STATE_STATUS = {
     "discarded": "discarded",
 }
 
-TRANSITIONS = {
+TRANSITIONS: dict[PlanState, set[PlanState]] = {
     "drafts": {"next", "discarded"},
     "next": {"open", "discarded"},
     "open": {"done", "discarded"},

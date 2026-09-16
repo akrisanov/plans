@@ -9,7 +9,7 @@ import yaml
 from pydantic import ValidationError
 
 from plans.config import PLANS_DIR, PLANS_HOME, STATE_STATUS, STATES
-from plans.models import PlanMetadata
+from plans.models import PlanInspection, PlanMetadata, PlanState
 
 
 def fail(message: str) -> NoReturn:
@@ -98,7 +98,7 @@ def update_metadata(path: Path, **values: str) -> None:
     )
 
 
-def validate_plan_state(state: str, path: Path) -> None:
+def validate_plan_state(state: PlanState, path: Path) -> None:
     metadata = read_metadata(path)
     expected_status = STATE_STATUS[state]
 
@@ -110,8 +110,8 @@ def validate_plan_state(state: str, path: Path) -> None:
         )
 
 
-def find_plan_matches(plan_id: str) -> list[tuple[str, Path]]:
-    matches: list[tuple[str, Path]] = []
+def find_plan_matches(plan_id: str) -> list[tuple[PlanState, Path]]:
+    matches: list[tuple[PlanState, Path]] = []
 
     for state in STATES:
         state_dir = PLANS_DIR / state
@@ -128,7 +128,7 @@ def find_plan_matches(plan_id: str) -> list[tuple[str, Path]]:
     return matches
 
 
-def find_plan(plan_id: str) -> tuple[str, Path]:
+def find_plan(plan_id: str) -> tuple[PlanState, Path]:
     matches = find_plan_matches(plan_id)
 
     if not matches:
@@ -142,3 +142,20 @@ def find_plan(plan_id: str) -> tuple[str, Path]:
     validate_plan_state(state, path)
 
     return state, path
+
+
+def inspect_plan(plan_id: str) -> PlanInspection:
+    state, path = find_plan(plan_id)
+    metadata = read_metadata(path)
+
+    return PlanInspection(
+        id=metadata.id,
+        state=state,
+        status=metadata.status,
+        repository=metadata.repository,
+        created_at=metadata.created_at,
+        updated_at=metadata.updated_at,
+        depends_on=metadata.depends_on,
+        prs=metadata.prs,
+        path=path.relative_to(PLANS_HOME).as_posix(),
+    )

@@ -9,6 +9,7 @@ from plans.config import (
     REQUIRED_READY_SECTIONS,
     STATE_STATUS,
 )
+from plans.models import PlanState
 from plans.storage import (
     display_path,
     read_document,
@@ -61,7 +62,7 @@ def has_meaningful_checklist_item(content: str) -> bool:
 
 
 def collect_validation_errors(
-    state: str,
+    state: PlanState,
     path: Path,
 ) -> list[str]:
     errors: list[str] = []
@@ -108,7 +109,7 @@ def collect_validation_errors(
     return errors
 
 
-def ensure_plan_valid(state: str, path: Path) -> None:
+def ensure_plan_valid(state: PlanState, path: Path) -> None:
     errors = collect_validation_errors(state, path)
 
     if not errors:

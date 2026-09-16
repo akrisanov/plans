@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -139,6 +140,52 @@ def test_add_rejects_empty_repository(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "repository must not be empty" in result.stderr
+
+
+def test_inspect_returns_plan_as_json(tmp_path: Path) -> None:
+    plan_dir = tmp_path / "plans" / "open"
+    plan_dir.mkdir(parents=True)
+    plan_path = plan_dir / "test-plan.md"
+    plan_path.write_text(
+        """---
+id: test-plan
+status: open
+repository: plans
+created_at: 2026-09-13
+updated_at: 2026-09-16
+depends_on:
+  - first-plan
+prs:
+  - https://example.com/pull/1
+---
+
+# Test plan
+""",
+        encoding="utf-8",
+    )
+
+    result = run_plan(tmp_path, "inspect", "test-plan", "--json")
+
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == {
+        "id": "test-plan",
+        "state": "open",
+        "status": "open",
+        "repository": "plans",
+        "created_at": "2026-09-13",
+        "updated_at": "2026-09-16",
+        "depends_on": ["first-plan"],
+        "prs": ["https://example.com/pull/1"],
+        "path": "plans/open/test-plan.md",
+    }
+    assert str(tmp_path) not in result.stdout
+
+
+def test_inspect_rejects_unknown_plan(tmp_path: Path) -> None:
+    result = run_plan(tmp_path, "inspect", "unknown-plan", "--json")
+
+    assert result.returncode != 0
+    assert "plan not found: unknown-plan" in result.stderr
 
 
 def test_fresh_draft_fails_validation(tmp_path: Path) -> None:

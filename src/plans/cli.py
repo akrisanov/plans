@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from plans.storage import (
     fail,
     find_plan,
     find_plan_matches,
+    inspect_plan,
     read_metadata,
     validate_plan_state,
 )
@@ -117,6 +119,11 @@ def command_show(args: argparse.Namespace) -> None:
     print(path.read_text(encoding="utf-8"), end="")
 
 
+def command_inspect(args: argparse.Namespace) -> None:
+    inspection = inspect_plan(args.id)
+    print(json.dumps(inspection.model_dump(mode="json")))
+
+
 def command_validate(args: argparse.Namespace) -> None:
     state, path = find_plan(args.id)
     ensure_plan_valid(state, path)
@@ -167,6 +174,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     show_parser.add_argument("id")
     show_parser.set_defaults(func=command_show)
+
+    inspect_parser = subparsers.add_parser(
+        "inspect",
+        help="Inspect a plan in a machine-readable format.",
+    )
+    inspect_parser.add_argument("id")
+    inspect_parser.add_argument(
+        "--json",
+        action="store_true",
+        required=True,
+        help="Return the inspection result as JSON.",
+    )
+    inspect_parser.set_defaults(func=command_inspect)
 
     validate_parser = subparsers.add_parser(
         "validate",
