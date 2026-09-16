@@ -1,35 +1,43 @@
 # plans
 
-A portable, harness-agnostic planning and coordination layer for agent-driven software work.
+`plans` keeps plans for agent-driven software work in Git.
 
-`plans` keeps durable planning state outside agent sessions.
-Agents may come and go; plans, decisions, lifecycle state, and verification criteria remain in Git.
+Plans are Markdown files with typed YAML metadata.
+The CLI creates plans, validates them, and moves them through a defined lifecycle.
 
-The project is intentionally independent of any specific model, agent harness, machine, or execution environment.
+Agent sessions are temporary.
+Plans, decisions, implementation steps, and verification criteria remain available after a session ends.
+
+The project does not depend on a specific model, agent harness, machine, or execution environment.
 
 ## Architecture
 
-`plans` separates reusable tooling from user-specific planning data.
+`plans` separates reusable tooling from private planning data.
 
 ```text
 plans                         plans-data
 public tooling                private state
 ──────────────                ─────────────
-scripts/plan          ──────> plans/
-templates/                    coordinators/
-AGENTS.md                     repos.yaml
-README.md                     AGENTS.md
+src/plans/            ──────> plans/
+  cli.py                       coordinators/
+  lifecycle.py                 repos.yaml
+  models.py                    AGENTS.md
+  storage.py
+  validation.py
+  templates/
+AGENTS.md
+README.md
 ```
 
-The `plans` repository contains the protocol, CLI, templates, and reusable agent instructions.
+The `plans` repository contains the Python package, CLI, plan template, and reusable agent instructions.
 
-Actual plans and repository configuration live in a separate data repository or directory configured through `PLANS_HOME`.
+Actual plans and repository configuration live in a separate directory or Git repository configured through `PLANS_HOME`.
 
-This keeps the tooling reusable and shareable without exposing private work.
+The separation allows the tooling to remain public while plans and repository configuration remain private.
 
 ## Plan lifecycle
 
-Plans move through a small deterministic state machine:
+Plans move through the following states:
 
 ```text
 drafts -> next -> open -> done
@@ -37,36 +45,62 @@ drafts -> next -> open -> done
    └────────┴───────┴──> discarded
 ```
 
-The states mean:
+The states have the following meanings:
 
-- `drafts` — incomplete plans still being researched or designed
-- `next` — plans ready for implementation
-- `open` — work currently in progress
-- `done` — completed work
-- `discarded` — work intentionally abandoned
+- `drafts` contains plans that are still being researched or written.
+- `next` contains plans that are ready for implementation.
+- `open` contains work that is in progress.
+- `done` contains completed work.
+- `discarded` contains work that was intentionally abandoned.
 
-A draft may move to `next` only after it passes readiness validation.
+A draft can move to `next` only after it passes readiness validation.
+
+Invalid state transitions are rejected by the CLI.
 
 ## Principles
 
-- Plans are durable state; agent sessions are disposable.
-- Git is the source of truth.
-- Planning state must survive switching models, harnesses, machines, or sessions.
-- Plans should contain enough context for another agent to continue without the previous conversation.
-- State transitions and structural validation should be deterministic.
-- Agents should do reasoning; scripts should enforce invariants.
-- Plans should reference repositories by logical name rather than absolute filesystem path.
-- Generated dashboards or indexes must not become authoritative state.
+Plans are durable state, while agent sessions are temporary. Git is the source of truth for plan data.
 
-## Setup
+A plan should contain enough context for another agent to continue the work without access to the previous conversation.
+State transitions and structural validation are handled by deterministic code rather than by an agent.
 
-Clone the tooling repository:
+Plans refer to repositories by logical name instead of absolute filesystem paths.
+The same plan can therefore be used on different machines and with different execution environments.
+
+The core planning format does not depend on Codex, Pi, Goose, or another specific agent harness.
+
+## Requirements
+
+`plans` requires Python 3.12 or later.
+
+The project uses `uv` for package and dependency management.
+
+## Installation
+
+Clone the repository:
 
 ```bash
 git clone https://github.com/akrisanov/plans.git
+cd plans
 ```
 
-Prepare a separate directory or repository for private planning data.
+Install the project:
+
+```bash
+uv sync
+```
+
+The `plan` command can then be run with:
+
+```bash
+uv run plan
+```
+
+You can also install the package so that `plan` is available directly in your environment.
+
+## Planning data
+
+Prepare a separate directory or Git repository for planning data.
 
 For example:
 
@@ -83,15 +117,15 @@ plans-data/
 └── repos.yaml
 ```
 
-Point the CLI at it:
+Set `PLANS_HOME` to the location of the data:
 
 ```bash
 export PLANS_HOME="$HOME/Projects/plans-data"
 ```
 
-The tooling does not require `PLANS_HOME` to live under `~/Projects`; that is only an example.
+The directory does not need to be under `~/Projects`. The path above is only an example.
 
-If `PLANS_HOME` is not set, the default is:
+If `PLANS_HOME` is not set, the default location is:
 
 ```text
 ~/.local/share/plans
@@ -99,53 +133,67 @@ If `PLANS_HOME` is not set, the default is:
 
 ## CLI
 
+Create a draft:
+
+```bash
+uv run plan add improve-cache-layer --repository backend
+```
+
+The command creates:
+
+```text
+$PLANS_HOME/plans/drafts/improve-cache-layer.md
+```
+
+Plan IDs use lowercase kebab-case.
+
 List plans:
 
 ```bash
-./scripts/plan list
+uv run plan list
 ```
 
 Show a plan:
 
 ```bash
-./scripts/plan show <id>
+uv run plan show improve-cache-layer
 ```
 
 Validate that a plan is ready for implementation:
 
 ```bash
-./scripts/plan validate <id>
+uv run plan validate improve-cache-layer
+```
+
+Validate a draft and move it to `next`:
+
+```bash
+uv run plan ready improve-cache-layer
 ```
 
 Move a plan through its lifecycle:
 
 ```bash
-./scripts/plan transition <id> <state>
+uv run plan transition improve-cache-layer open
+uv run plan transition improve-cache-layer done
 ```
 
-For example:
+The CLI rejects invalid transitions.
 
-```bash
-./scripts/plan transition improve-cache-layer next
-./scripts/plan transition improve-cache-layer open
-./scripts/plan transition improve-cache-layer done
-```
-
-Invalid lifecycle transitions are rejected.
-
-Moving a plan from `drafts` to `next` automatically runs readiness validation.
+Moving a plan from `drafts` to `next` runs readiness validation automatically.
+The `ready` command provides the same validated transition for drafts.
 
 ## Plan format
 
-Reusable plan structure is defined in:
+The plan template is stored in:
 
 ```text
-templates/plan.md
+src/plans/templates/plan.md
 ```
 
-A plan uses YAML frontmatter for machine-readable state and Markdown for reasoning and implementation context.
+Each plan contains YAML frontmatter followed by Markdown sections.
 
-Example:
+For example:
 
 ```yaml
 ---
@@ -161,23 +209,41 @@ prs: []
 ---
 ```
 
-Plans reference repositories by registry name:
+The metadata is parsed with PyYAML and validated with Pydantic.
+
+The current metadata schema includes:
+
+- `id`
+- `status`
+- `repository`
+- `created_at`
+- `updated_at`
+- `depends_on`
+- `prs`
+
+Unknown metadata fields are rejected.
+
+The Markdown body records the problem, decisions, implementation steps, verification steps, completion criteria, and results.
+
+A draft must contain meaningful content in the sections required for readiness before it can move to `next`.
+
+## Repository registry
+
+Plans refer to repositories by logical name:
 
 ```yaml
 repository: backend
 ```
 
-rather than machine-specific paths such as:
+Machine-specific paths should not be stored in plans.
+
+Repository mappings belong in:
 
 ```text
-/Users/alice/Projects/backend
+$PLANS_HOME/repos.yaml
 ```
 
-## Repository registry
-
-User-specific repository mappings belong in `PLANS_HOME/repos.yaml`, not in this repository.
-
-Example:
+For example:
 
 ```yaml
 version: 1
@@ -189,51 +255,36 @@ repositories:
     default_branch: main
 ```
 
-How a repository is resolved into an actual workspace is intentionally outside the plan format.
-
-This allows the same plan to be executed locally, on another workstation, in a container, or in a remote development environment.
+The plan format does not define where a repository must exist on disk.
+Repository resolution can therefore be implemented separately for local machines, containers, or remote environments.
 
 ## Agent harnesses
 
-`plans` does not depend on a particular agent harness.
+`plans` does not execute coding agents itself.
 
-It is intended to work with systems such as:
+The planning format is intended to work with Codex, Pi, Goose, and other agent runtimes that can read and update files.
 
-- Codex
-- Pi
-- Goose
-- other agent runtimes capable of reading and updating files
-
-Harness-specific execution belongs outside the core planning protocol.
+Execution code that depends on a specific harness belongs outside the core planning protocol.
 
 ## Related projects
 
-- My [local-agent-stack](https://github.com/akrisanov/local-agent-stack) is a reproducible local environment
-for running and evaluating agent harnesses and models. It complements `plans` as an execution layer
-while `plans` remains responsible for durable planning and coordination state.
+[local-agent-stack](https://github.com/akrisanov/local-agent-stack) is my reproducible environment
+for running and evaluating local agent harnesses and models.
+
+`plans` stores planning state. `local-agent-stack` handles execution.
+The two projects are separate so that planning data does not depend on a particular agent runtime.
 
 ## Inspiration
 
-This project was inspired by Fatih Arslan's article [How I manage my agents](https://arslan.io/2026/09/11/how-i-manage-my-agents/).
+The project was inspired by Fatih Arslan's article [How I manage my agents](https://arslan.io/2026/09/11/how-i-manage-my-agents/).
 
-The article describes a Git-backed workflow where plans move through `drafts`, `next`, `open`, `done`, and `discarded`,
-while coordinators manage work performed by disposable agent sessions.
-
-`plans` takes those ideas as a starting point and explores a portable implementation that is independent
-of Cursor Projects or any other specific agent harness. The goal is to keep the planning protocol and durable
-state reusable across local agents, cloud agents, different models, and different execution environments.
+`plans` uses the same basic idea and implements it independently.
+The project keeps the planning format separate from any specific agent harness or local machine setup.
 
 ## Status
 
-The project is early and intentionally small.
-
-Current functionality includes:
-
-- deterministic plan lifecycle transitions
-- structural readiness validation
-- separation of reusable tooling from private plan data
-
-Planned next steps include deterministic plan creation and higher-level lifecycle conveniences.
+The current version supports plan creation, typed metadata, readiness validation, lifecycle transitions,
+and separate private planning data.
 
 ## License
 
