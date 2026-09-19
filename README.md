@@ -187,8 +187,8 @@ plan --help
 | `plan inspect <id> --json`                | Emit machine-readable plan information for execution tooling.    |
 | `plan validate <id>`                      | Validate plan metadata and structure.                            |
 | `plan ready <id>`                         | Check implementation readiness and move a valid draft to `next`. |
-| `plan complete <id>`                      | Validate completion results and move an open plan to `done`.      |
-| `plan transition <id> <state>`            | Perform a valid lifecycle transition (except `open` to `done`).   |
+| `plan complete <id>`                      | Validate completion results and move an open plan to `done`.     |
+| `plan transition <id> <state>`            | Perform a valid lifecycle transition (except `open` to `done`).  |
 | `plan --help`                             | Show CLI help.                                                   |
 | `plan <command> --help`                   | Show help for a specific command.                                |
 
@@ -255,10 +255,14 @@ For example, [`local-agent-stack`](https://github.com/akrisanov/local-agent-stac
 
 1. inspects the plan;
 2. verifies that it is in `next`;
-3. resolves the target repository through `repos.yaml` and `REPOS_HOME`;
-4. performs deterministic preflight checks;
-5. transitions the plan to `open`;
-6. starts the selected agent harness in the target repository.
+3. verifies that the selected plan is committed and unchanged in Git;
+4. resolves the target repository through `repos.yaml` and `REPOS_HOME`;
+5. performs the remaining deterministic preflight checks;
+6. transitions the plan to `open`;
+7. starts the selected agent harness in the target repository.
+
+This preserves the exact implementation-ready plan used for execution in Git history.
+The check belongs to the execution layer rather than plans itself.
 
 Example:
 
@@ -329,7 +333,7 @@ The plan format is not tied to Pi, Codex, Goose, or any particular model provide
 
 ## Status
 
-The current vertical slice is working:
+The v1 core is feature-complete and is being stabilized through real usage.
 
 ```text
 create
@@ -340,6 +344,8 @@ ready
   ↓
 next
   ↓
+checkpoint
+  ↓
 run
   ↓
 open
@@ -348,21 +354,20 @@ agent
   ↓
 review
   ↓
+complete
+  ↓
 done
 ```
 
-Plan creation, validation, readiness, inspection, lifecycle management,
-and the initial Pi execution path are implemented and have been exercised end to end.
+Plan creation, validation, readiness, inspection, lifecycle management, and completion
+have been exercised end to end on real implementation work.
 
-Completion validation and the final transition to `done` are deterministic; recording and reviewing
-results remains a user responsibility.
+The implementation-ready next plan is preserved in Git before execution begins,
+and the verified result is recorded separately when the plan is completed. This keeps
+both the input to implementation and its final outcome recoverable from Git history.
 
-Possible next steps include:
-
-- result recording tooling;
-- additional execution harnesses;
-- dependency-aware coordination;
-- queues and parallel execution.
+The v1 public contracts are now being stabilized through continued dogfooding before
+the v1.0.0 release.
 
 ---
 
