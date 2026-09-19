@@ -263,34 +263,142 @@ def test_transition_next_to_open(tmp_path: Path) -> None:
     assert "status: open" in open_path.read_text(encoding="utf-8")
 
 
-def test_transition_open_to_done(tmp_path: Path) -> None:
-    create_ready_plan(tmp_path)
+def open_plan(tmp_path: Path, plan_id: str = "test-plan") -> Path:
+    create_ready_plan(tmp_path, plan_id)
+    assert run_plan(tmp_path, "ready", plan_id).returncode == 0
+    assert run_plan(tmp_path, "transition", plan_id, "open").returncode == 0
+    return tmp_path / "plans" / "open" / f"{plan_id}.md"
 
-    ready_result = run_plan(tmp_path, "ready", "test-plan")
-    assert ready_result.returncode == 0
 
-    open_result = run_plan(
-        tmp_path,
-        "transition",
-        "test-plan",
-        "open",
+def make_complete(path: Path, deviations: str = "None") -> None:
+    content = path.read_text(encoding="utf-8")
+    content = content.replace("- [ ] Plan is moved", "- [x] Plan is moved", 1)
+    content = content.replace("- Commit:", "- Commit: abc123", 1)
+    content = content.replace(
+        "### Verification\n\nTODO", "### Verification\n\nAll tests passed.", 1
     )
-    assert open_result.returncode == 0
-
-    result = run_plan(
-        tmp_path,
-        "transition",
-        "test-plan",
-        "done",
+    content = content.replace(
+        "### Deviations\n\nTODO", f"### Deviations\n\n{deviations}", 1
     )
+    path.write_text(content, encoding="utf-8")
+
+
+def test_complete_open_plan(tmp_path: Path) -> None:
+    source = open_plan(tmp_path)
+    make_complete(source)
+
+    result = run_plan(tmp_path, "complete", "test-plan")
 
     assert result.returncode == 0
     assert "test-plan: open -> done" in result.stdout
+    assert not source.exists()
+    done = tmp_path / "plans" / "done" / "test-plan.md"
+    assert done.is_file()
+    assert "status: done" in done.read_text(encoding="utf-8")
 
-    done_path = tmp_path / "plans" / "done" / "test-plan.md"
 
-    assert done_path.is_file()
-    assert "status: done" in done_path.read_text(encoding="utf-8")
+def test_transition_open_to_done_is_rejected(tmp_path: Path) -> None:
+    source = open_plan(tmp_path)
+    original = source.read_text(encoding="utf-8")
+
+    result = run_plan(tmp_path, "transition", "test-plan", "done")
+
+    assert result.returncode == 1
+    assert "use 'plan complete'" in result.stderr
+    assert source.read_text(encoding="utf-8") == original
+
+
+def test_complete_rejects_plan_outside_open(tmp_path: Path) -> None:
+    create_ready_plan(tmp_path)
+    result = run_plan(tmp_path, "complete", "test-plan")
+    assert result.returncode == 1
+    assert "plan is not open" in result.stderr
+
+
+def test_complete_rejects_state_status_disagreement(tmp_path: Path) -> None:
+    source = open_plan(tmp_path)
+    source.write_text(
+        source.read_text(encoding="utf-8").replace("status: open", "status: next"),
+        encoding="utf-8",
+    )
+    result = run_plan(tmp_path, "complete", "test-plan")
+    assert result.returncode == 1
+    assert "inconsistent plan state" in result.stderr
+
+
+def test_complete_rejections_leave_plan_unchanged(tmp_path: Path) -> None:
+    cases = {
+        "unchecked": lambda text: text,
+        "todo": lambda text: text.replace(
+            "### Deviations\n\nTODO", "### Deviations\n\nNone"
+        ).replace("- Commit:", "- Commit: abc123"),
+        "commit": lambda text: text.replace(
+            "### Verification\n\nTODO", "### Verification\n\nPassed"
+        ).replace("### Deviations\n\nTODO", "### Deviations\n\nNone"),
+        "verification": lambda text: text.replace(
+            "- Commit:", "- Commit: abc123"
+        ).replace("### Deviations\n\nTODO", "### Deviations\n\nNone"),
+        "deviations": lambda text: text.replace(
+            "- Commit:", "- Commit: abc123"
+        ).replace("### Verification\n\nTODO", "### Verification\n\nPassed"),
+    }
+    expected = {
+        "unchecked": "unchecked items",
+        "todo": "unresolved TODO",
+        "commit": "non-empty Commit",
+        "verification": "Verification must contain",
+        "deviations": "Deviations must contain",
+    }
+    for name, mutate in cases.items():
+        plan_id = f"case-{name}"
+        path = open_plan(tmp_path, plan_id)
+        text = mutate(path.read_text(encoding="utf-8"))
+        if name != "unchecked":
+            text = text.replace("- [ ] Plan is moved", "- [x] Plan is moved")
+        path.write_text(text, encoding="utf-8")
+        before = path.read_bytes()
+        result = run_plan(tmp_path, "complete", plan_id)
+        assert result.returncode == 1
+        assert expected[name] in result.stderr
+        assert path.read_bytes() == before
+
+
+def test_complete_rejects_missing_done_when_section(tmp_path: Path) -> None:
+    source = open_plan(tmp_path)
+    make_complete(source)
+    content = source.read_text(encoding="utf-8")
+    start = content.index("## Done when\n")
+    end = content.index("## Results\n", start)
+    source.write_text(content[:start] + content[end:], encoding="utf-8")
+
+    result = run_plan(tmp_path, "complete", "test-plan")
+
+    assert result.returncode == 1
+    assert "missing required section: Done when" in result.stderr
+    assert source.is_file()
+
+
+def test_complete_rejects_done_when_without_checkboxes(tmp_path: Path) -> None:
+    source = open_plan(tmp_path)
+    make_complete(source)
+    content = source.read_text(encoding="utf-8").replace(
+        "## Done when\n\n- [x] Plan is moved to the next state.",
+        "## Done when\n\nCompletion criterion recorded as prose.",
+        1,
+    )
+    source.write_text(content, encoding="utf-8")
+
+    result = run_plan(tmp_path, "complete", "test-plan")
+
+    assert result.returncode == 1
+    assert "must contain at least one meaningful checklist item" in result.stderr
+    assert source.is_file()
+
+
+def test_complete_accepts_explicit_none_deviations(tmp_path: Path) -> None:
+    source = open_plan(tmp_path)
+    make_complete(source, deviations="None")
+    assert run_plan(tmp_path, "complete", "test-plan").returncode == 0
 
 
 def test_transition_rejects_invalid_transition(tmp_path: Path) -> None:

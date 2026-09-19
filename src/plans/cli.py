@@ -11,7 +11,7 @@ from plans.config import (
     PLANS_DIR,
     STATES,
 )
-from plans.lifecycle import ready_plan, transition_plan
+from plans.lifecycle import complete_plan, ready_plan, transition_plan
 from plans.storage import (
     display_path,
     fail,
@@ -139,6 +139,10 @@ def command_transition(args: argparse.Namespace) -> None:
     transition_plan(args.id, args.state)
 
 
+def command_complete(args: argparse.Namespace) -> None:
+    complete_plan(args.id)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="plan",
@@ -201,6 +205,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ready_parser.add_argument("id")
     ready_parser.set_defaults(func=command_ready)
+
+    complete_parser = subparsers.add_parser(
+        "complete",
+        help="Validate an open plan's results and move it to done.",
+    )
+    complete_parser.add_argument("id")
+    complete_parser.set_defaults(func=command_complete)
 
     transition_parser = subparsers.add_parser(
         "transition",

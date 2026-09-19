@@ -187,7 +187,8 @@ plan --help
 | `plan inspect <id> --json`                | Emit machine-readable plan information for execution tooling.    |
 | `plan validate <id>`                      | Validate plan metadata and structure.                            |
 | `plan ready <id>`                         | Check implementation readiness and move a valid draft to `next`. |
-| `plan transition <id> <state>`            | Perform a valid lifecycle transition.                            |
+| `plan complete <id>`                      | Validate completion results and move an open plan to `done`.      |
+| `plan transition <id> <state>`            | Perform a valid lifecycle transition (except `open` to `done`).   |
 | `plan --help`                             | Show CLI help.                                                   |
 | `plan <command> --help`                   | Show help for a specific command.                                |
 
@@ -270,7 +271,9 @@ uv run scripts/run-plan add-feature --harness pi
 The runner currently supports Pi.
 
 Agent failure does not automatically complete or roll back a plan. Once implementation has started,
-the plan remains `open` until its result is reviewed.
+the plan remains `open` until its results are recorded and `plan complete <id>` succeeds. Completion
+requires all `Done when` items to be checked, a commit value, verification results, and explicit
+deviations (`None` is accepted). Direct `plan transition <id> done` is not supported.
 
 ## Development
 
@@ -351,12 +354,12 @@ done
 Plan creation, validation, readiness, inspection, lifecycle management,
 and the initial Pi execution path are implemented and have been exercised end to end.
 
-Completion review, result recording, and the final transition to `done` are still manual.
+Completion validation and the final transition to `done` are deterministic; recording and reviewing
+results remains a user responsibility.
 
 Possible next steps include:
 
-- deterministic completion validation;
-- result recording and completion tooling;
+- result recording tooling;
 - additional execution harnesses;
 - dependency-aware coordination;
 - queues and parallel execution.
